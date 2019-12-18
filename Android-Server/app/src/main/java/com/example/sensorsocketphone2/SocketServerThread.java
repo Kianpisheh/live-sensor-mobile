@@ -88,7 +88,9 @@ public class SocketServerThread extends Thread {
                 mainHandler.sendMessage(msg);
                 isListening = false;
                 // handle service sensors
-                serviceThread.stopSensorService();
+                if (serviceThread != null) {
+                    serviceThread.stopSensorService();
+                }
             }
         }
     }

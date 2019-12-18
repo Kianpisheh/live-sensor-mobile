@@ -97,6 +97,9 @@ public class ServiceThread extends Thread implements SensorEventListener {
     }
 
     private void handleRequest(HashMap<String, Integer> requests) {
+        if (requests == null) {
+            return;
+        }
         List<String> sensors = new ArrayList<>();
         for (Map.Entry<String, Integer> request : requests.entrySet()) {
             if (request.getValue() == 1) {
