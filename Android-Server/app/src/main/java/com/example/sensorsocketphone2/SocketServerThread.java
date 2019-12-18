@@ -76,6 +76,7 @@ public class SocketServerThread extends Thread {
     }
 
     public void stopServer() {
+        // handle the server socket
         if (serverSocket != null) {
             try {
                 serverSocket.close();
@@ -86,8 +87,9 @@ public class SocketServerThread extends Thread {
                 msg.what = SERVER_CLOSED;
                 mainHandler.sendMessage(msg);
                 isListening = false;
+                // handle service sensors
+                serviceThread.stopSensorService();
             }
         }
     }
-
 }

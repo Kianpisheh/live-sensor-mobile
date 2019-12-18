@@ -5,10 +5,12 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.AsyncTask;
 import android.os.Handler;
 import android.util.Log;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
 
@@ -22,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.json.JSONObject;
+
 public class ServiceThread extends Thread implements SensorEventListener {
 
     private Socket client;
@@ -30,8 +34,9 @@ public class ServiceThread extends Thread implements SensorEventListener {
     private final static String TAG = "";
     private DataOutputStream outputStream;
     private InputStreamReader inputStream;
+    private boolean stopThread = false;
 
-    String ACC_STR = "acc";
+    private final static String ACC_STR = "acc";
 
 
     public ServiceThread(Context context, Socket client) {
@@ -58,12 +63,11 @@ public class ServiceThread extends Thread implements SensorEventListener {
     @Override
     public void run() {
         HashMap<String, Integer> req;
-        while (true) {
+        while (!stopThread) {
             if (inputStream != null) {
                 try {
                     System.out.println("waiting for requests");
                     req = readRequest(inputStream);
-                    System.out.println(req.toString());
                     handleRequest(req);
                 } catch (IOException ex) {
                     ex.printStackTrace();
@@ -103,7 +107,6 @@ public class ServiceThread extends Thread implements SensorEventListener {
     }
 
     private void updateService(List<String> newSensorList) {
-
         // register newly subscribed sensors
         SensorManager sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
         for (String requestedSensor : newSensorList) {
@@ -119,17 +122,6 @@ public class ServiceThread extends Thread implements SensorEventListener {
         sensorsList = newSensorList;
     }
 
-    private DataInputStream resetInputStream() {
-        DataInputStream inStream = null;
-        try {
-            inStream = new DataInputStream(client.getInputStream());
-        } catch (IOException ex) {
-            ex.printStackTrace();
-            Log.e(TAG, "resetInputStream: error in resetting the input stream");
-        }
-        return inStream;
-    }
-
     private int getSensorType(String sensor) {
         int type = -300;
         if (sensor.equals(ACC_STR)) {
@@ -138,14 +130,49 @@ public class ServiceThread extends Thread implements SensorEventListener {
         return type;
     }
 
+    public void stopSensorService() {
+        SensorManager sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(this);
+        }
+        stopThread = true;
+    }
+
     // sensors-related methods
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
         System.out.println(sensorEvent.values[0]);
+        new SensorDataTransmit().execute(sensorEvent);
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {
 
+    }
+
+    private class SensorDataTransmit extends AsyncTask<SensorEvent, Void, Void> {
+
+        @Override
+        protected Void doInBackground(SensorEvent... events) {
+            SensorEvent event = events[0];
+            try {
+                String stringJson = createJSonString(event);
+                System.out.println(stringJson);
+                outputStream.writeUTF(stringJson);
+                outputStream.flush();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            return null;
+        }
+
+        private String createJSonString(SensorEvent event) {
+            JsonObject jsonObj = new JsonObject();
+            jsonObj.addProperty("s", ACC_STR);
+            jsonObj.addProperty("t",System.currentTimeMillis());
+            jsonObj.addProperty("v", event.values[0]);
+
+            return jsonObj.toString();
+        }
     }
 }
